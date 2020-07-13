@@ -1,6 +1,10 @@
 package models
 
-import "sync"
+import (
+	"errors"
+	"net"
+	"sync"
+)
 
 type ConnectionMap struct {
 	inner sync.Map
@@ -23,16 +27,41 @@ func (cs *ConnectionMap) Keys() []string {
 	return keys
 }
 
-func (cs *ConnectionMap) Range(fn func(key string, value Connection) bool) {
+func (cs *ConnectionMap) forEach(fn func(key string, value Connection) bool) {
 	cs.inner.Range(func(key, value interface{}) bool {
 		return fn(key.(string), value.(Connection))
 	})
 }
 
-func (cs *ConnectionMap) Store(key string, value Connection) {
-	cs.inner.Store(key, value)
+func contains(arr []string, value string) bool {
+	for _, v := range arr {
+		if v == value {
+			return true
+		}
+	}
+	return false
 }
 
-func (cs *ConnectionMap) Delete(key string) {
-	cs.inner.Delete(key)
+func (cs *ConnectionMap) WithEvent(event string, fn func(key string, value Connection)) {
+	cs.forEach(func(key string, value Connection) bool {
+		if contains(value.Events, event) {
+			fn(key, value)
+		}
+		return true
+	})
+}
+
+func (cs *ConnectionMap) Unregister(id string) {
+	cs.inner.Delete(id)
+}
+
+func (cs *ConnectionMap) Register(id string, c net.Conn, events []string) error {
+	if _, ok := cs.inner.Load(id); ok {
+		return errors.New("already exists")
+	}
+	cs.inner.Store(id, Connection{
+		Socket: c,
+		Events: events,
+	})
+	return nil
 }

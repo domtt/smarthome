@@ -27,45 +27,18 @@ func tcpServer() {
 	}
 }
 
-func contains(arr []string, value string) bool {
-	for _, v := range arr {
-		if v == value {
-			return true
-		}
-	}
-	return false
-}
-
 func notify(c net.Conn, event string, message string) {
 	msg := event + " " + message
 	c.Write([]byte(msg + "\n"))
 }
 
 func notifyAll(id, event string, message string) {
-	connectionMap.Range(func(key string, value models.Connection) bool {
+	connectionMap.WithEvent(event, func(key string, value models.Connection) {
 		// make sure receipient != sender
 		if key != id {
-			if contains(value.Events, event) {
-				notify(value.Socket, event, message)
-				return false
-			}
+			notify(value.Socket, event, message)
 		}
-		return true
 	})
-}
-
-func registerConnection(id string, c net.Conn, events []string) error {
-	connectionMap.Store(id, models.Connection{
-		Socket: c,
-		Events: events,
-	})
-	updateActive()
-	return nil
-}
-
-func unregister(id string) {
-	connectionMap.Delete(id)
-	updateActive()
 }
 
 func updateActive() {
@@ -79,7 +52,8 @@ func handleTcp(c net.Conn) {
 	for {
 		cmd, e := bufio.NewReader(c).ReadString('\n')
 		if e != nil {
-			unregister(id)
+			connectionMap.Unregister(id)
+			updateActive()
 			break
 		}
 		words := strings.Split(strings.TrimSpace(strings.ToLower(cmd)), " ")
@@ -88,11 +62,12 @@ func handleTcp(c net.Conn) {
 			if len(words) == 3 {
 				id = words[1]
 				events := strings.Split(words[2], ",")
-				e := registerConnection(id, c, events)
+				e := connectionMap.Register(id, c, events)
 				if e != nil {
 					c.Write([]byte(e.Error() + "\n"))
 					break
 				}
+				updateActive()
 			}
 		case "trigger":
 			message := ""
