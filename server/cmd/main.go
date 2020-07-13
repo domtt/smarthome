@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -27,12 +28,25 @@ func tcpServer() {
 	}
 }
 
-func notify(c net.Conn, event string, message string) {
-	msg := event + " " + message
-	c.Write([]byte(msg + "\n"))
+type Message struct {
+	Event   string      `json:"event"`
+	Payload interface{} `json:"payload"`
 }
 
-func notifyAll(id, event string, message string) {
+func notify(c net.Conn, event string, payload interface{}) {
+	msg := Message{
+		event,
+		payload,
+	}
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		fmt.Println("fuck")
+		return
+	}
+	c.Write([]byte(string(msgBytes) + "\n"))
+}
+
+func notifyAll(id, event string, message interface{}) {
 	connectionMap.WithEvent(event, func(key string, value models.Connection) {
 		// make sure receipient != sender
 		if key != id {
@@ -42,7 +56,7 @@ func notifyAll(id, event string, message string) {
 }
 
 func updateActive() {
-	notifyAll("", ":active", strings.Join(connectionMap.Keys(), ","))
+	notifyAll("", ":active", connectionMap.Keys())
 }
 
 func handleTcp(c net.Conn) {
@@ -70,14 +84,18 @@ func handleTcp(c net.Conn) {
 				updateActive()
 			}
 		case "trigger":
-			message := ""
+			var payload interface{}
 			if len(words) > 2 {
-				message = words[2]
+				payloadStr := strings.Join(words[2:], " ")
+				e := json.Unmarshal([]byte(payloadStr), &payload)
+				if e != nil {
+					fmt.Println(e)
+				}
 			}
-			notifyAll(id, words[1], message)
-			c.Write([]byte("triggered\n"))
+			notifyAll(id, words[1], payload)
+			//c.Write([]byte("triggered\n"))
 		default:
-			c.Write([]byte("command not found\n"))
+			//c.Write([]byte("command not found\n"))
 		}
 	}
 }
