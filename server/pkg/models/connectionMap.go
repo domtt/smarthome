@@ -55,13 +55,9 @@ func (cs *ConnectionMap) Unregister(id string) {
 	cs.inner.Delete(id)
 }
 
-func (cs *ConnectionMap) Register(id string, c net.Conn, events []string) error {
-	if _, ok := cs.inner.Load(id); ok {
-		return errors.New("already exists")
-	}
+func (cs *ConnectionMap) Register(id string, c net.Conn, events []string) {
 	cs.inner.Store(id, Connection{
 		Socket: c,
 		Events: events,
 	})
-	return nil
 }

@@ -67,6 +67,7 @@ func handleTcp(c net.Conn) {
 		cmd, e := bufio.NewReader(c).ReadString('\n')
 		if e != nil {
 			connectionMap.Unregister(id)
+			fmt.Println("disconnect " + c.RemoteAddr().String())
 			updateActive()
 			break
 		}
@@ -76,11 +77,7 @@ func handleTcp(c net.Conn) {
 			if len(words) == 3 {
 				id = words[1]
 				events := strings.Split(words[2], ",")
-				e := connectionMap.Register(id, c, events)
-				if e != nil {
-					c.Write([]byte(e.Error() + "\n"))
-					break
-				}
+				connectionMap.Register(id, c, events)
 				updateActive()
 			}
 		case "trigger":
