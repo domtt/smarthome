@@ -6,7 +6,12 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"time"
 )
+
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
+}
 
 func GetToken() (string, error) {
 	var loginBody LoginBody
